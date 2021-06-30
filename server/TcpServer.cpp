@@ -1,4 +1,4 @@
-#include "TcpServer.h"
+#include "include/TcpServer.h"
 
 TcpServer::TcpServer(char *port)
 {
@@ -7,7 +7,7 @@ TcpServer::TcpServer(char *port)
 
 TcpServer::~TcpServer()
 {
-    delete port;
+    delete this->port;
 }
 
 int TcpServer::open_listenfd()
@@ -55,8 +55,52 @@ int TcpServer::open_listenfd()
     return -1;
 }
 
+// 设置非阻塞
+void setnonblocking(int fd)
+{
+    int old_option = fcntl(fd, F_GETFL);
+    int new_option = old_option | O_NONBLOCK;
+    fcntl(fd, F_SETFL, new_option);
+}
+
 void TcpServer::run()
 {
+    // 获取到可用的监听套接字 文件描述符
     int listenfd = open_listenfd();
+    if (listenfd == -1)
+    {
+        perror("Server Error: Can't establish a listenfd!\n");
+        exit(-1);
+    }
+
+    // 使用epoll创建事件循环对象
+    int epfd = epoll_create1(EPOLL_CLOEXEC);
+
+    // 添加监听套接字事件
+    struct epoll_event event;
+    event.data.fd = listenfd;
+    event.events = EPOLLIN;
+
+    setnonblocking(listenfd);
+
+    epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &event);
+    
+    struct epoll_event events[5];
+
+    while (1)
+    {
+        int ready_num = epoll_wait(epfd, events, 5, -1);
+
+        for (int i = 0; i < ready_num; i++)
+        {
+            if (events[i].data.fd == listenfd && (events[i].events & EPOLLIN))
+            {
+                // 有新的连接
+            }
+            
+        }
+        
+    }
+    
     
 }
