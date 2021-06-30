@@ -1,3 +1,6 @@
+#ifndef TCPSERVER_H
+#define TCPSERVER_H
+
 #include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
@@ -20,3 +23,5 @@ public:
     int open_listenfd();
     void run();
 };
+
+#endif
