@@ -1,4 +1,4 @@
-#include "include/Buffer.h"
+#include "include/net/Buffer.h"
 
 Buffer::Buffer()
 {
@@ -10,6 +10,115 @@ Buffer::Buffer()
 Buffer::~Buffer()
 {
     delete data;
+}
+
+bool Buffer::tryRead()
+{
+    // 先尝试获取协议头
+    size_t header_length = sizeof(Header);
+    if (getRemaining() >= header_length)
+    {
+        Header *header = (Header *)malloc(header_length);
+        // 字节级拷贝
+        memcpy((char*)header, data+readIndex, header_length);
+
+        // 携带数据长度
+        long long data_length = header->length;
+        // 是否形成一次完整的协议报文
+        if (getRemaining() >= data_length+header_length)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+        
+    }
+    
+}
+
+Header * Buffer::readHeader()
+{
+    size_t len = sizeof(Header);
+
+    if (getRemaining() >= len)
+    {
+        Header *header = (Header *)malloc(len);
+        // 字节级拷贝
+        memcpy((char*)header, data+readIndex, len);
+
+        // 修改接收buffer的读指针
+        readIndex += len;
+
+        return header;
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+void * Buffer::readData(size_t len, int interface_type)
+{
+    if (getRemaining() >= len)
+    {
+        void * ptr = NULL;
+        // 针对特定接口的请求参数数据
+        switch (interface_type)
+        {
+        case USER_REGISTER:
+        {
+            REGISTER *data = (REGISTER *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
+        case USER_LOGIN:
+        {
+            LOGIN *data = (LOGIN *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
+        case USER_GET_FRIEND_LIST:
+        {
+            GET_FRIEND_LIST *data = (GET_FRIEND_LIST *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
+        case CHART_ONE_INTERFACE:
+        {
+            CHART_ONE *data = (CHART_ONE *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
+        case USER_GET_CHART_RECORD:
+        {
+            GET_CHART_RECORD *data = (GET_CHART_RECORD *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
+        default:
+            break;
+        }
+        return ptr;
+    }
+    return NULL;
+    
 }
 
 size_t Buffer::getRemaining()

@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include "../chart_logic/protocol.h"
 
 #define DEFAULT_SIZE 512
 
@@ -17,7 +18,10 @@ public:
     Buffer();
     ~Buffer();
     int writeBuffer(size_t len, char *ptr);
+    // 对于接收缓冲区的常用函数
     bool tryRead();
+    Header * readHeader();
+    void * readData(size_t len, int interface_type);
 
     char * readBuffer();
 

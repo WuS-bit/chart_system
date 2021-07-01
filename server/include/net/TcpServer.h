@@ -10,8 +10,16 @@
 #include <fcntl.h>
 #include <cstring>
 #include <netdb.h>
+#include <map>
+
+#include "EventLoopThreadpool.h"
+#include "TcpConnection.h"
 
 #define MAX_QUEUE_LENGTH 1024
+
+using namespace std;
+
+map<int, TcpConnection *> clnt_conns;
 
 class TcpServer
 {

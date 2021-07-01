@@ -1,4 +1,4 @@
-#include "include/TcpServer.h"
+#include "include/net/TcpServer.h"
 
 TcpServer::TcpServer(char *port)
 {
@@ -87,6 +87,14 @@ void TcpServer::run()
     
     struct epoll_event events[5];
 
+    struct sockaddr_in *clnt_addr;
+    socklen_t len = sizeof(struct sockaddr_in);
+
+    // 创建从reactor资源池
+    EventLoopThreadpool *pool = new EventLoopThreadpool();
+    // 启动从reactor
+    pool->start();
+
     while (1)
     {
         int ready_num = epoll_wait(epfd, events, 5, -1);
@@ -96,11 +104,12 @@ void TcpServer::run()
             if (events[i].data.fd == listenfd && (events[i].events & EPOLLIN))
             {
                 // 有新的连接
-            }
-            
-        }
-        
-    }
-    
-    
+                clnt_addr = (struct sockaddr_in *)malloc(len);
+                int sockfd = accept(listenfd, (struct sockaddr *)clnt_addr, &len);
+
+                TcpConnection *conn = new TcpConnection(sockfd, clnt_addr);
+                pool->addConn(conn);
+            }          
+        }     
+    } 
 }

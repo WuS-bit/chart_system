@@ -1,8 +1,14 @@
 #ifndef TCPCONNECTION_H
 #define TCPCONNECTION_H
 
+#include <functional>
+
 #include "Buffer.h"
 #include "InetAddress.h"
+#include "../chart_logic/ThreadTask.h"
+#include "LogicServer.h"
+
+using namespace std;
 
 class TcpConnection
 {
@@ -21,7 +27,13 @@ public:
     int getSockfd();
     InetAddress *getInetAddr();
     char *getPeerInfo();
+
+    void onMessageRecv(char *buf, size_t len);
+
+    void onSend();
+    void onWriteMsg(char *buf, size_t len);
 };
 
+extern LogicServer logicServer; // 全局对象，仅用来提供回调函数
 
 #endif

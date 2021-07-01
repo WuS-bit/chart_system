@@ -1,4 +1,4 @@
-#include "include/InetAddress.h"
+#include "include/net/InetAddress.h"
 
 InetAddress::InetAddress(sockaddr_in* address)
 {
