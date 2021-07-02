@@ -11,9 +11,9 @@ TcpConnection::~TcpConnection()
     delete clnt_addr;
 }
 
-void TcpConnection::setEpfd(int epfd)
+void TcpConnection::setEventLoop(EventLoop *loop)
 {
-    this->epfd = epfd;
+    this->eventLoop = loop;
 }
 
 char *TcpConnection::getPeerInfo()
@@ -58,7 +58,12 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             ThreadTask *task = new ThreadTask(this, fptr, USER_GET_ACCOUNT, data);        
 
             // 交付线程池执行即可
+            pool->produceTask(task);
 
+            // 取出执行结果，发起响应IO
+
+
+            // 本次请求彻底响应完毕，销毁任务
 
         }
         break;
@@ -76,6 +81,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             ThreadTask *task = new ThreadTask(this, fptr, USER_REGISTER, data);        
 
             // 交付线程池执行即可
+            pool->produceTask(task);
         }
         break;
         case USER_LOGIN:
@@ -92,6 +98,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             ThreadTask *task = new ThreadTask(this, fptr, USER_LOGIN, data);        
 
             // 交付线程池执行即可
+            pool->produceTask(task);
         }
         break;
         case USER_GET_FRIEND_LIST:
@@ -157,12 +164,53 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
     
 }
 
+// 只负责网络通信功能，不面向协议
 void TcpConnection::onWriteMsg(char *buf, size_t len)
 {
+    // 执行网络发送功能，利用应用层缓冲区
 
+    // 如果应用层缓冲区有数据，先写入缓冲区
+    if (sendBuffer.getRemaining() > 0)
+    {
+        sendBuffer.writeBuffer(len, buf);
+
+        // 添加可写触发事件
+        this->eventLoop->modfd(this->sockfd, EPOLLOUT);
+    }
+    else
+    {
+        // 直接利用套接字发送，若内和缓冲区已满，则先放入应用缓冲区
+        long ret = send(sockfd, buf, len, 0);
+        if (ret >= 0 && ret == len)
+        {
+            // 全部写入内核缓冲区
+            return;
+        }
+        else if (ret < 0)
+        {
+            // 出错
+        }
+        else
+        {
+            // 没写完，加入应用层缓冲区
+            sendBuffer.writeBuffer(len-ret, buf+ret);
+            this->eventLoop->modfd(sockfd, EPOLLOUT);
+        }     
+    }
+    
 }
 
+// 由EventLoop可写事件触发
 void TcpConnection::onSend()
 {
+    size_t len = sendBuffer.getRemaining();
+    char *buf = sendBuffer.readAllBuffer();
 
+    // 调用实际发送函数
+    onWriteMsg(buf, len);
+}
+
+EventLoop * TcpConnection::getEventLoop()
+{
+    return this->eventLoop;
 }

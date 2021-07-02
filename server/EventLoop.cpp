@@ -9,10 +9,21 @@ EventLoop::EventLoop()
         // 创建失败
     }
     this->events = (struct epoll_event *)malloc(sizeof(struct epoll_event)*MAX_EVENT_NUM);
+
+    efd = eventfd(0, 0);
+    addfd(efd);
 }
 
 EventLoop::~EventLoop()
 {
+    close(efd);
+    close(epfd);
+    delete events;
+}
+
+int EventLoop::getEfd()
+{
+    return efd;
 }
 
 void EventLoop::setnonblocking(int fd)
@@ -58,6 +69,31 @@ void EventLoop::loop()
         int ready_num = epoll_wait(this->epfd, this->events, MAX_EVENT_NUM, -1);
         for (int i = 0; i < ready_num; i++)
         {
+
+            // 事件通知事件，处理积累的IO事件
+            if (this->events[i].data.fd == efd)
+            {
+                uint64_t one = 1;
+                read(efd, &one, sizeof(one));
+                // 需要操作回调队列，使用循环CAS
+                while (!CAS(&pool->flag, 0, 1))
+                {
+                }
+                
+                // 保证线程安全
+                while (io_cb_queue.size() > 0)
+                {
+                    auto cb = io_cb_queue.front();
+                    io_cb_queue.pop_front();
+
+                    // 执行回调函数，进行IO（写socket）
+                    cb();
+                }
+                CAS(&pool->flag, 1, 0);
+                continue;
+            }
+            
+
             // 获取到连接套接字
             int sockfd = events[i].data.fd;
             TcpConnection *conn = NULL;
@@ -126,6 +162,9 @@ void EventLoop::loop()
 
 bool EventLoop::addConn(TcpConnection *conn)
 {
+    // 绑定连接对应的EventLoop
+    conn->setEventLoop(this);
+
     int sockfd = conn->getSockfd();
     // 将连接对象套接字加到epoll对象上管理
     this->addfd(sockfd);

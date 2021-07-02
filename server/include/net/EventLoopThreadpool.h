@@ -6,7 +6,9 @@
 #include "TcpConnection.h"
 #include "EventLoopThread.h"
 
-#define THREAD_NUM 5
+#define THREAD_NUM 10
+
+class EventLoopThread;
 
 class EventLoopThreadpool
 {

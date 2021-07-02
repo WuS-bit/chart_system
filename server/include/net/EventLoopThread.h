@@ -6,6 +6,9 @@
 #include "EventLoop.h"
 #include "TcpConnection.h"
 
+class EventLoop;
+class TcpConnection;
+
 class EventLoopThread
 {
 private:

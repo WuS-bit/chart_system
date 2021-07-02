@@ -14,3 +14,20 @@ ThreadTask::~ThreadTask()
     delete callbackFunc;
     delete args;
 }
+
+TcpConnection *ThreadTask::getConn()
+{
+    return this->conn;
+}
+void *ThreadTask::getCallback()
+{
+    return this->callbackFunc;
+}
+int ThreadTask::getServiceType()
+{
+    return this->serviceType;
+}
+void *ThreadTask::getArgs()
+{
+    return this->args;
+}

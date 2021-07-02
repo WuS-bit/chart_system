@@ -12,6 +12,8 @@ Buffer::~Buffer()
     delete data;
 }
 
+
+// 下面三个函数都与定义的通信协议紧耦合，因为需要按照协议读取
 bool Buffer::tryRead()
 {
     // 先尝试获取协议头
@@ -121,6 +123,18 @@ void * Buffer::readData(size_t len, int interface_type)
     
 }
 
+// 下面函数与发送数据有关
+char * Buffer::readAllBuffer()
+{
+    size_t len = getRemaining();
+    char *buf = (char *)malloc(len);
+
+    memcpy(buf, data+readIndex, len);
+    readIndex += len;
+    return buf;
+}
+
+
 size_t Buffer::getRemaining()
 {
     return this->writeIndex - this->readIndex;
@@ -179,6 +193,4 @@ int Buffer::writeBuffer(size_t len, char *ptr)
     this->writeIndex += len;
     return len;
 }
-
-
 

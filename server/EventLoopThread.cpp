@@ -2,7 +2,7 @@
 
 EventLoopThread::EventLoopThread()
 {
-    this->thread = new pthread_t();
+    this->thread = (pthread_t *)malloc(sizeof(pthread_t));
     this->loop = new EventLoop();
 }
 

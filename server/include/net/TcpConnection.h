@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "Buffer.h"
+#include "EventLoop.h"
 #include "InetAddress.h"
 #include "../chart_logic/ThreadTask.h"
 #include "../chart_logic/Threadpool.h"
@@ -11,10 +12,13 @@
 
 using namespace std;
 
+class LogicServer;
+class Threadpool;
+
 class TcpConnection
 {
 private:
-    int epfd; // 绑定到的epoll对象描述符
+    EventLoop * eventLoop; // 绑定到的epoll对象描述符，应该使用EventLoop对象
     int sockfd; //连接套接字描述符
     InetAddress * clnt_addr;
     Buffer recvBuffer;
@@ -23,7 +27,7 @@ public:
     TcpConnection(int fd, sockaddr_in *clnt_addr);
     ~TcpConnection();
 
-    void setEpfd(int epfd);
+    void setEventLoop(EventLoop *loop);
     
     int getSockfd();
     InetAddress *getInetAddr();
@@ -33,6 +37,8 @@ public:
 
     void onSend();
     void onWriteMsg(char *buf, size_t len);
+
+    EventLoop * getEventLoop();
 };
 
 extern LogicServer logicServer; // 全局对象，仅用来提供回调函数

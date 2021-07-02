@@ -19,7 +19,7 @@
 
 using namespace std;
 
-map<int, TcpConnection *> clnt_conns;
+class TcpConnection;
 
 class TcpServer
 {
@@ -31,5 +31,7 @@ public:
     int open_listenfd();
     void run();
 };
+
+map<int, TcpConnection *> clnt_conns;
 
 #endif
