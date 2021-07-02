@@ -6,6 +6,7 @@
 #include "Buffer.h"
 #include "InetAddress.h"
 #include "../chart_logic/ThreadTask.h"
+#include "../chart_logic/Threadpool.h"
 #include "LogicServer.h"
 
 using namespace std;
@@ -35,5 +36,6 @@ public:
 };
 
 extern LogicServer logicServer; // 全局对象，仅用来提供回调函数
+extern Threadpool *pool; // 全局业务线程池对象，每个连接均使用此线程池
 
 #endif

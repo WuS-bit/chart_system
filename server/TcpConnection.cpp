@@ -108,6 +108,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             ThreadTask *task = new ThreadTask(this, fptr, USER_GET_FRIEND_LIST, data);        
 
             // 交付线程池执行即可
+            pool->produceTask(task);
         }
         break;
         case CHART_ONE_INTERFACE:
@@ -124,6 +125,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             ThreadTask *task = new ThreadTask(this, fptr, CHART_ONE_INTERFACE, data);        
 
             // 交付线程池执行即可
+            pool->produceTask(task);
         }
         break;
         case USER_GET_CHART_RECORD:
@@ -140,6 +142,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             ThreadTask *task = new ThreadTask(this, fptr, USER_GET_CHART_RECORD, data);        
 
             // 交付线程池执行即可
+            pool->produceTask(task);
         }
         break;
         default:
