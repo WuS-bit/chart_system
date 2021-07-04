@@ -27,7 +27,7 @@ using namespace std;
 class TcpConnection;
 class Threadpool;
 
-extern Threadpool *pool;
+// extern Threadpool *pool;
 extern map<int, TcpConnection *> clnt_conns;
 
 class EventLoop
@@ -49,7 +49,7 @@ public:
     int getEfd();
 
     // 相当于消息队列排队作用,避免响应数据乱序
-    deque<std::function<void()>> io_cb_queue;
+    deque<std::function<void()> *> io_cb_queue;
 
 };
 

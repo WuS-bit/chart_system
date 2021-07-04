@@ -1,5 +1,11 @@
 #include "include/net/EventLoopThread.h"
 
+static void * start_routine(void *arg)
+{
+    EventLoopThread *loop = (EventLoopThread *)arg;
+    loop->run();
+}
+
 EventLoopThread::EventLoopThread()
 {
     this->thread = (pthread_t *)malloc(sizeof(pthread_t));
@@ -21,12 +27,6 @@ void EventLoopThread::start()
 bool EventLoopThread::addConn(TcpConnection *conn)
 {
     this->loop->addConn(conn);
-}
-
-static void * start_routine(void *arg)
-{
-    EventLoopThread *loop = (EventLoopThread *)arg;
-    loop->run();
 }
 
 void EventLoopThread::run()

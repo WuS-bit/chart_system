@@ -8,12 +8,13 @@
 #include "InetAddress.h"
 #include "../chart_logic/ThreadTask.h"
 #include "../chart_logic/Threadpool.h"
-#include "LogicServer.h"
+#include "../chart_logic/LogicServer.h"
 
 using namespace std;
 
 class LogicServer;
 class Threadpool;
+class EventLoop;
 
 class TcpConnection
 {

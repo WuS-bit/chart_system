@@ -71,8 +71,10 @@ void EventLoop::loop()
         {
 
             // 事件通知事件，处理积累的IO事件
+            // 暂时废弃
             if (this->events[i].data.fd == efd)
             {
+                printf("lail\n");
                 uint64_t one = 1;
                 read(efd, &one, sizeof(one));
                 // 需要操作回调队列，使用循环CAS
@@ -87,7 +89,7 @@ void EventLoop::loop()
                     io_cb_queue.pop_front();
 
                     // 执行回调函数，进行IO（写socket）
-                    cb();
+                    (*cb)();
                 }
                 CAS(&pool->flag, 1, 0);
                 continue;
@@ -109,6 +111,7 @@ void EventLoop::loop()
 
             if (this->events[i].events & EPOLLIN)
             {
+                fprintf(stdout, "读到数据\n");
                 // 处理连接读事件
                 while (1)
                 {
@@ -133,7 +136,22 @@ void EventLoop::loop()
                     }
                     else if (ret == 0)
                     {
-                        // 表示对方连接已关闭
+                        // 表示对方连接已关闭，对方下线也要做些逻辑处理
+                        Header *header = (Header *)malloc(sizeof(Header));
+                        header->type = USER_LOGOUT;
+                        header->length = sizeof(LOGOUT);
+
+                        LOGOUT *req = (LOGOUT *)malloc(sizeof(LOGOUT));
+                        req->sockfd = this->events[i].data.fd;
+
+                        char b[sizeof(Header)+sizeof(LOGOUT)+1];
+                        memcpy(b, header, sizeof(Header));
+                        memcpy(b+sizeof(Header), req, sizeof(LOGOUT));
+                        
+                        // 这里会改变用户在线状态
+                        conn->onMessageRecv(b, sizeof(Header)+sizeof(LOGOUT));
+
+
                         delete conn;
                         clnt_conns.erase(sockfd);
                         delfd(sockfd);

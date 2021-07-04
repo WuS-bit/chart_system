@@ -30,13 +30,6 @@ class ThreadTask;
 //     TaskNode * next;
 // }TaskNode;
 
-typedef struct ThreadArgs
-{
-    Threadpool *pool;
-    ThreadTask *task;
-} ThreadArgs;
-
-
 class Threadpool
 {
 private:
@@ -59,6 +52,9 @@ public:
 
     void warm_up(ThreadTask *task);
 
+    void do_work(ThreadTask *);
+
+
     bool isFull();
     bool isEmpty();
 
@@ -72,7 +68,15 @@ public:
     volatile int64_t flag;
 };
 
+// typedef struct ThreadArgs
+// {
+//     Threadpool *pool;
+//     ThreadTask *task;
+// } ThreadArgs;
 
-Threadpool * pool = new Threadpool(CPU_NUM, MAXQUEUESIZE);
+#ifndef POOL
+#define POOL
+extern Threadpool * pool;
+#endif
 
 #endif

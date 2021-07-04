@@ -53,17 +53,44 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // 绑定业务逻辑的回调函数
             std::function<ALLOC_ACCOUNT *()> callback;
             callback = std::bind(&LogicServer::do_alloc_account, logicServer);
-            void * fptr = (void *)&callback;
+            void * fptr = (void *)new std::function<ALLOC_ACCOUNT *()>(callback);;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_ACCOUNT, data);        
+            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_ACCOUNT, data, pool); 
+
+            // ALLOC_ACCOUNT *p = (*((std::function<ALLOC_ACCOUNT *()> *)task->getCallback()))();
+            // printf("%s\n", p->account);
+
+
+            // fprintf(stdout, "交付给线程池\n");       
 
             // 交付线程池执行即可
-            pool->produceTask(task);
+            // pool->produceTask(task);
 
-            // 取出执行结果，发起响应IO
+            // 得到业务处理回调函数并调用
+            std::function<ALLOC_ACCOUNT *()> *cb = (std::function<ALLOC_ACCOUNT *()> *)task->getCallback();
+            ALLOC_ACCOUNT *res = (*cb)();
+            Header * header = (Header *)malloc(sizeof(Header));
+            header->type = SERVER_ALLOC_ACCOUNT;
+            header->length = sizeof(ALLOC_ACCOUNT);
 
 
-            // 本次请求彻底响应完毕，销毁任务
+            // 写回响应数据
+            this->onWriteMsg((char *)header, sizeof(Header));
+            this->onWriteMsg((char *)res, sizeof(ALLOC_ACCOUNT));
+
+            // 封装回调函数 
+            // auto cb1 = std::bind(&TcpConnection::onWriteMsg, *task->getConn(), (char *)header, sizeof(Header));
+            // auto cb2 = std::bind(&TcpConnection::onWriteMsg, *task->getConn(), (char *)res, sizeof(ALLOC_ACCOUNT));
+
+            // this->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            // this->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+
+
+            // uint64_t one = 1;
+            // write(this->getEventLoop()->getEfd(), &one, sizeof(one));
+            // fprintf(stdout, "线程池执行完任务\n");
+
+            // 线程任务内存泄漏
 
         }
         break;
@@ -78,10 +105,22 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             callback = std::bind(&LogicServer::do_register, logicServer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
             void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_REGISTER, data);        
+            ThreadTask *task = new ThreadTask(this, fptr, USER_REGISTER, data, pool);        
 
             // 交付线程池执行即可
-            pool->produceTask(task);
+            // pool->produceTask(task);
+
+            // 在此线程中执行业务处理
+            REGISTER * request = (REGISTER *)data;
+            RESPONSE_STATUS *res = callback(request->account, request->username, request->password);
+
+            // 响应头
+            Header *header = (Header *)malloc(sizeof(Header));
+            header->type = SERVER_STATUS;
+            header->length = sizeof(RESPONSE_STATUS); // 只保存此次数据长度
+
+            this->onWriteMsg((char *)header, sizeof(Header));
+            this->onWriteMsg((char *)res, sizeof(RESPONSE_STATUS));
         }
         break;
         case USER_LOGIN:
@@ -95,10 +134,53 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             callback = std::bind(&LogicServer::do_login, logicServer, std::placeholders::_1, std::placeholders::_2);
             void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_LOGIN, data);        
+            ThreadTask *task = new ThreadTask(this, fptr, USER_LOGIN, data, pool);        
 
             // 交付线程池执行即可
-            pool->produceTask(task);
+            // pool->produceTask(task);
+
+            LOGIN * req = (LOGIN *)data;
+            LOGIN_RESPONSE *res = callback(req->account, req->password);
+
+            // 记录登录状态
+            user.insert(std::pair<std::string, int>(res->account, this->sockfd));
+            find_user.insert(std::pair<int, std::string>(this->sockfd, res->account));
+
+            // 广播所有在线用户
+            map<int, TcpConnection *>::iterator iter;
+            iter = clnt_conns.begin();
+            while (iter != clnt_conns.end())
+            {
+                TcpConnection *ptr = iter->second;
+                if (ptr != this)
+                {
+                    // 返回在线列表
+                    Header *header = (Header *)malloc(sizeof(Header));
+                    header->type = SERVER_RESPONSE_FRIEND_LIST;
+                    header->length = sizeof(RESPONSE_FRIEND_LIST) + sizeof(FriendInfo)*(user.size()-1);
+
+                    // 获取该用户名
+                    string username = find_user.find(iter->first)->second;
+
+                    RESPONSE_FRIEND_LIST *list = logicServer.do_get_friend_list(username.c_str());
+                    
+                    
+                    ptr->onWriteMsg((char *)header, sizeof(Header));
+                    ptr->onWriteMsg((char *)list, sizeof(RESPONSE_FRIEND_LIST));
+                    ptr->onWriteMsg((char *)list->array, sizeof(FriendInfo)*list->friend_num);
+
+                }
+                else
+                {
+                    // 回送登陆成功响应
+                    Header *header = (Header *)malloc(sizeof(Header));
+                    header->type = SERVER_LOGIN_RESPONSE;
+                    header->length = sizeof(LOGIN_RESPONSE);
+
+                    this->onWriteMsg((char *)header, sizeof(Header));
+                    this->onWriteMsg((char *)res, sizeof(LOGIN_RESPONSE));
+                }
+            }
         }
         break;
         case USER_GET_FRIEND_LIST:
@@ -112,10 +194,22 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             callback = std::bind(&LogicServer::do_get_friend_list, logicServer, std::placeholders::_1);
             void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_FRIEND_LIST, data);        
+            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_FRIEND_LIST, data, pool);        
 
             // 交付线程池执行即可
-            pool->produceTask(task);
+            // pool->produceTask(task)
+
+            GET_FRIEND_LIST * req = (GET_FRIEND_LIST *)data;
+            RESPONSE_FRIEND_LIST *res = callback(req->account);
+
+            Header *header = (Header *)malloc(sizeof(Header));
+            header->type = SERVER_RESPONSE_FRIEND_LIST;
+            header->length = sizeof(RESPONSE_FRIEND_LIST)+sizeof(FriendInfo)*res->friend_num;
+
+            this->onWriteMsg((char *)header, sizeof(Header));
+            this->onWriteMsg((char *)res, sizeof(RESPONSE_FRIEND_LIST));
+            this->onWriteMsg((char *)res->array, sizeof(FriendInfo)*res->friend_num);
+            
         }
         break;
         case CHART_ONE_INTERFACE:
@@ -129,10 +223,30 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             callback = std::bind(&LogicServer::do_chart_one, logicServer, std::placeholders::_1);
             void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, CHART_ONE_INTERFACE, data);        
+            ThreadTask *task = new ThreadTask(this, fptr, CHART_ONE_INTERFACE, data, pool);        
 
             // 交付线程池执行即可
-            pool->produceTask(task);
+            // pool->produceTask(task);
+
+            CHART_ONE * req = (CHART_ONE *)data;
+            CHART_ONE *res = callback(req);
+
+            Header *header = (Header *)malloc(sizeof(Header));
+            header->type = CHART_ONE_INTERFACE;
+            header->length = sizeof(CHART_ONE);
+
+            // 也给自己写消息
+            this->onWriteMsg((char *)header, sizeof(Header));
+            this->onWriteMsg((char *)res, sizeof(CHART_ONE));
+
+            // 实质上需要向用户会送消息发送成功ACK信息，简化后不需要，直接推送消息
+            string name = res->recver;
+            int sockfd = user.find(name)->second;
+            TcpConnection *conn = clnt_conns.find(sockfd)->second;
+
+            conn->onWriteMsg((char *)header, sizeof(Header));
+            conn->onWriteMsg((char *)res, sizeof(CHART_ONE));
+
         }
         break;
         case USER_GET_CHART_RECORD:
@@ -146,10 +260,121 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             callback = std::bind(&LogicServer::do_get_chart_record, logicServer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
             void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_CHART_RECORD, data);        
+            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_CHART_RECORD, data, pool);        
 
             // 交付线程池执行即可
-            pool->produceTask(task);
+            // pool->produceTask(task);
+
+            GET_CHART_RECORD * req = (GET_CHART_RECORD *)data;
+            SERV_CHART_RECORD *res = callback(req->sender, req->recver, req->num);
+
+            Header *header = (Header *)malloc(sizeof(Header));
+            header->type = SERVER_CHART_RECORD;
+            header->length = sizeof(SERV_CHART_RECORD)+sizeof(ChartOneRecord)*res->num;
+
+            this->onWriteMsg((char *)header, sizeof(Header));
+            this->onWriteMsg((char *)res, sizeof(SERV_CHART_RECORD));
+            this->onWriteMsg((char *)res->records, sizeof(ChartOneRecord)*res->num);
+            
+        }
+        break;
+        case CHART_GROUP_INTERFACE:
+        {
+            // 群发消息，将消息写入记录文件后，广播给其他在线用户
+
+            // 读取对应的数据
+            void * data = this->recvBuffer.readData(header->length, CHART_GROUP_INTERFACE);
+            // 调用用户注册接口
+
+            // 绑定业务逻辑的回调函数
+            std::function<CHART_GROUP *(CHART_GROUP *)> callback;
+            callback = std::bind(&LogicServer::do_chart_group, logicServer, std::placeholders::_1);
+            void * fptr = (void *)&callback;
+
+            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_CHART_RECORD, data, pool);        
+
+            // 交付线程池执行即可
+            // pool->produceTask(task);
+
+            CHART_GROUP * req = (CHART_GROUP *)data;
+            CHART_GROUP *res = callback(req);
+
+            Header *header = (Header *)malloc(sizeof(Header));
+            header->type = CHART_GROUP_INTERFACE;
+            header->length = sizeof(CHART_GROUP);
+
+            // 直接广播给所有用户，包括自己
+            map<string, int>::iterator iter;
+            iter = user.begin();
+            while (iter!=user.end())
+            {
+                int sockfd = iter->second;
+                TcpConnection *conn = clnt_conns.find(sockfd)->second;
+
+                conn->onWriteMsg((char *)header, sizeof(Header));
+                conn->onWriteMsg((char *)res, sizeof(CHART_GROUP));
+            }
+            
+        }
+        break;
+        case USER_GET_GROUP_RECORD:
+        {
+            // 读取对应的数据
+            void * data = this->recvBuffer.readData(header->length, USER_GET_GROUP_RECORD);
+            // 调用用户注册接口
+
+            // 绑定业务逻辑的回调函数
+            std::function<SERV_GROUP_RECORD *()> callback;
+            callback = std::bind(&LogicServer::do_get_group_record, logicServer);
+            void * fptr = (void *)&callback;
+
+            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_CHART_RECORD, data, pool);        
+
+            // 交付线程池执行即可
+            // pool->produceTask(task);
+
+            // GET_CHART_RECORD * req = (GET_CHART_RECORD *)data;
+            SERV_GROUP_RECORD *res = callback();
+
+            Header *header = (Header *)malloc(sizeof(Header));
+            header->type = SERVER_GROUP_RECORD;
+            header->length = sizeof(SERV_GROUP_RECORD)+sizeof(ChartGroupRecord)*res->num;
+
+            this->onWriteMsg((char *)header, sizeof(Header));
+            this->onWriteMsg((char *)res, sizeof(SERV_GROUP_RECORD));
+            this->onWriteMsg((char *)res->records, sizeof(ChartGroupRecord)*res->num);
+            
+        }
+        break;
+        case USER_LOGOUT:
+        {
+            // 用户下线，更新服务器在线列表，并通知在线用户
+            
+            LOGOUT *req = (LOGOUT *)this->recvBuffer.readData(header->length, USER_LOGOUT);
+
+            string name = find_user.find(req->sockfd)->second;
+            find_user.erase(req->sockfd);
+            user.erase(name);
+
+            map<string, int>::iterator iter;
+            iter = user.begin();
+            while (iter != user.end())
+            {
+                string username = iter->first;
+                int sockfd = iter->second;
+                TcpConnection *conn = clnt_conns.find(sockfd)->second;
+
+                RESPONSE_FRIEND_LIST *list = logicServer.do_get_friend_list(username.c_str());
+
+                Header *header = (Header *)malloc(sizeof(Header));
+                header->type = SERVER_RESPONSE_FRIEND_LIST;
+                header->length = sizeof(RESPONSE_FRIEND_LIST)+sizeof(FriendInfo)*list->friend_num;
+
+                conn->onWriteMsg((char *)header, sizeof(Header));
+                conn->onWriteMsg((char *)list, sizeof(RESPONSE_FRIEND_LIST));
+                conn->onWriteMsg((char *)list->array, sizeof(FriendInfo)*list->friend_num);
+            }
+            
         }
         break;
         default:

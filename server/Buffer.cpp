@@ -114,6 +114,29 @@ void * Buffer::readData(size_t len, int interface_type)
             ptr = (void *)data;
         }
         break;
+        case CHART_GROUP_INTERFACE:
+        {
+            CHART_GROUP *data = (CHART_GROUP *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
+        case USER_GET_GROUP_RECORD:
+        {
+            
+        }
+        break;
+        case USER_LOGOUT:
+        {
+            LOGOUT *data = (LOGOUT *)malloc(len);
+            memcpy((char *)data, this->data+readIndex, len);
+
+            readIndex+=len;
+            ptr = (void *)data;
+        }
+        break;
         default:
             break;
         }

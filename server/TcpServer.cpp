@@ -1,5 +1,7 @@
 #include "include/net/TcpServer.h"
 
+map<int, TcpConnection *> clnt_conns;
+
 TcpServer::TcpServer(char *port)
 {
     this->port = port;
@@ -95,6 +97,8 @@ void TcpServer::run()
     // 启动从reactor
     pool->start();
 
+    fprintf(stdout, "服务器启动......\n");
+
     while (1)
     {
         int ready_num = epoll_wait(epfd, events, 5, -1);
@@ -106,6 +110,7 @@ void TcpServer::run()
                 // 有新的连接
                 clnt_addr = (struct sockaddr_in *)malloc(len);
                 int sockfd = accept(listenfd, (struct sockaddr *)clnt_addr, &len);
+                fprintf(stdout, "有新的连接\n");
 
                 TcpConnection *conn = new TcpConnection(sockfd, clnt_addr);
                 pool->addConn(conn);

@@ -16,13 +16,13 @@ public:
     bool signal();
 };
 
-Condition::Condition(MutexLock *mutexLock)
+inline Condition::Condition(MutexLock *mutexLock)
 {
     this->m_mutex = mutexLock;
     pthread_cond_init(&this->m_cond, NULL);
 }
 
-Condition::~Condition()
+inline Condition::~Condition()
 {
     pthread_cond_destroy(&this->m_cond);
     if (m_mutex != NULL)
@@ -31,12 +31,12 @@ Condition::~Condition()
     }
 }
 
-bool Condition::wait()
+inline bool Condition::wait()
 {
     return pthread_cond_wait(&m_cond, &m_mutex->m_mutex) == 0;
 }
 
-bool Condition::signal()
+inline bool Condition::signal()
 {
     return pthread_cond_signal(&m_cond) == 0;
 }

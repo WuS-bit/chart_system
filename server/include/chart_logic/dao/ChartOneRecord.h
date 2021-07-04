@@ -1,6 +1,10 @@
 #ifndef CHARTONERECORD_H
 #define CHARTONERECORD_H
 
+#include <cstring>
+
+using namespace std;
+
 class ChartOneRecord
 {
 private:
@@ -11,14 +15,22 @@ private:
 public:
     ChartOneRecord(/* args */);
     ~ChartOneRecord();
+    void setContent(const char *, const char *, const char*);
 };
 
-ChartOneRecord::ChartOneRecord(/* args */)
+inline ChartOneRecord::ChartOneRecord(/* args */)
 {
 }
 
-ChartOneRecord::~ChartOneRecord()
+inline ChartOneRecord::~ChartOneRecord()
 {
+}
+
+inline void ChartOneRecord::setContent(const char *sender, const char *recver, const char *msg)
+{
+    strcpy(this->sender, sender);
+    strcpy(this->recver, recver);
+    strcpy(this->msg, msg);
 }
 
 

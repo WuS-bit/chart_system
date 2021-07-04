@@ -1,4 +1,7 @@
 #include "include/chart_logic/Threadpool.h"
+#include <typeinfo>
+
+Threadpool * pool = new Threadpool(CPU_NUM, MAXQUEUESIZE);
 
 Threadpool::Threadpool(int threadNums, int maxQueueSize)
 {
@@ -21,25 +24,39 @@ Threadpool::~Threadpool()
 
 // 线程执行例程
 static void * worker(void * args)
-{
-    ThreadArgs *data = (ThreadArgs *)args;
-    ThreadTask *task = data->task;
-    Threadpool *pool = data->pool;
+{   
 
-    // 不停执行任务队列中的任务
+    // ThreadTask *task = (ThreadTask *)args;
+    Threadpool *pool = (Threadpool *)args;
+    ThreadTask *task =NULL;
+
     while (1)
     {
+        task = pool->consumeTask();
         pool->excuteTask(task);
+        printf("hhh\n");
 
         // 更改为由从Reactor执行IO，因此，线程池中不能销毁任务
         // delete task;
-        task = pool->consumeTask();
+        // task = pool->consumeTask();
     }
+
+    // pool->do_work(task);
     
+}
+
+void Threadpool::do_work(ThreadTask *task)
+{
+    // ALLOC_ACCOUNT *p = (*((std::function<ALLOC_ACCOUNT *()> *)task->getCallback()))();
+    // printf("%s\n", p->account);
+
+    // printf("线程拿到任务\n");
+    // 不停执行任务队列中的任务
 }
 
 void Threadpool::excuteTask(ThreadTask *task)
 {
+    printf("pool指针没问题\n");
     // 分析任务体，执行对应业务逻辑函数
     int serviceType = task->getServiceType();
     TcpConnection *conn = task->getConn();
@@ -50,8 +67,9 @@ void Threadpool::excuteTask(ThreadTask *task)
         {
             // 得到业务处理回调函数并调用
             std::function<ALLOC_ACCOUNT *()> *cb = (std::function<ALLOC_ACCOUNT *()> *)task->getCallback();
+            printf("回调函数有问题?\n");
             ALLOC_ACCOUNT *data = (*cb)();
-
+            printf("回调函数没问题\n");
             Header * header = (Header *)malloc(sizeof(Header));
             header->type = SERVER_ALLOC_ACCOUNT;
             header->length = sizeof(ALLOC_ACCOUNT);
@@ -60,15 +78,19 @@ void Threadpool::excuteTask(ThreadTask *task)
             auto cb1 = std::bind(&TcpConnection::onWriteMsg, *task->getConn(), (char *)header, sizeof(Header));
             auto cb2 = std::bind(&TcpConnection::onWriteMsg, *task->getConn(), (char *)data, sizeof(ALLOC_ACCOUNT));
 
+            fprintf(stdout, "线程池执行完任务\n");
+
             // 循环CAS
             while(!CAS(&this->flag, 0, 1)) ;
 
             // 线程安全下添加
-            conn->getEventLoop()->io_cb_queue.push_back(cb1);
-            conn->getEventLoop()->io_cb_queue.push_back(cb2);
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+
 
             CAS(&this->flag, 1, 0);
-
+            // sleep(2);
+            fprintf(stdout, "线程池执行完任务\n");
         }
         break;
         case USER_REGISTER:
@@ -92,8 +114,9 @@ void Threadpool::excuteTask(ThreadTask *task)
             while (!CAS(&this->flag, 0, 1)) ;
 
             // 线程安全下添加
-            conn->getEventLoop()->io_cb_queue.push_back(cb1);
-            conn->getEventLoop()->io_cb_queue.push_back(cb2);
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+
 
             CAS(&this->flag, 1, 0);
 
@@ -120,8 +143,9 @@ void Threadpool::excuteTask(ThreadTask *task)
             while (!CAS(&this->flag, 0, 1)) ;
 
             // 线程安全下添加
-            conn->getEventLoop()->io_cb_queue.push_back(cb1);
-            conn->getEventLoop()->io_cb_queue.push_back(cb2);
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+
 
             CAS(&this->flag, 1, 0);
         }
@@ -138,7 +162,7 @@ void Threadpool::excuteTask(ThreadTask *task)
             // 封装响应数据到IO线程
             Header *header = (Header *)malloc(sizeof(Header));
             header->type = SERVER_RESPONSE_FRIEND_LIST;
-            header->length = sizeof(RESPONSE_FRIEND_LIST);
+            header->length = sizeof(RESPONSE_FRIEND_LIST) + sizeof(FriendInfo)*response->friend_num;
 
             // 回调函数
             std::function<void()> cb1 = std::bind(&TcpConnection::onWriteMsg, *task->getConn(), (char *)header, sizeof(Header));
@@ -150,9 +174,9 @@ void Threadpool::excuteTask(ThreadTask *task)
             while (!CAS(&this->flag, 0, 1)) ;
 
             // 线程安全下添加
-            conn->getEventLoop()->io_cb_queue.push_back(cb1);
-            conn->getEventLoop()->io_cb_queue.push_back(cb2);
-            conn->getEventLoop()->io_cb_queue.push_back(cb3);
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb3));
 
             CAS(&this->flag, 1, 0);
         }
@@ -179,8 +203,9 @@ void Threadpool::excuteTask(ThreadTask *task)
             while (!CAS(&this->flag, 0, 1)) ;
 
             // 线程安全下添加
-            conn->getEventLoop()->io_cb_queue.push_back(cb1);
-            conn->getEventLoop()->io_cb_queue.push_back(cb2);
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+
 
             CAS(&this->flag, 1, 0);
         }
@@ -207,8 +232,9 @@ void Threadpool::excuteTask(ThreadTask *task)
             while (!CAS(&this->flag, 0, 1)) ;
 
             // 线程安全下添加
-            conn->getEventLoop()->io_cb_queue.push_back(cb1);
-            conn->getEventLoop()->io_cb_queue.push_back(cb2);
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb1));
+            conn->getEventLoop()->io_cb_queue.push_back(new std::function<void()>(cb2));
+
 
             CAS(&this->flag, 1, 0);
         }
@@ -220,17 +246,17 @@ void Threadpool::excuteTask(ThreadTask *task)
     // 唤醒对应的EventLoop的eventfd
     uint64_t one = 1;
     write(conn->getEventLoop()->getEfd(), &one, sizeof(one));
+    fprintf(stdout, "线程池执行完任务\n");
 }
 
 // 线程池预热到打满核心线程
 void Threadpool::warm_up(ThreadTask *task)
 {
+    fprintf(stdout, "线程池预热\n");
     if (curAliveThreadNUm < coreThreadNum)
     {
-        ThreadArgs * arg = (ThreadArgs *)malloc(sizeof(ThreadArgs));
-        arg->pool = this;
-        arg->task = task;
-        pthread_create(&coreThreads[coreThreadNum], NULL, worker, arg);
+        pthread_create(&coreThreads[coreThreadNum], NULL, worker, (void *)task->getPool());
+
         // 分离线程
         pthread_detach(coreThreads[coreThreadNum++]);
     }
@@ -250,26 +276,43 @@ bool Threadpool::isEmpty()
 // 生产者向线程池任务队列中添加任务
 void Threadpool::produceTask(ThreadTask *task)
 {
-    // 若核心线程池未打满，直接创建线程执行
-    if (curAliveThreadNUm < coreThreadNum)
-    {
-        warm_up(task);
-    }
-    else // 将人物添加到任务队列中
-    {
-        this->locker->lock();
 
-        if (isFull()) // 任务队列满，阻塞
-        {
-            // 条件变量等待
-            this->notFull->wait();
-        }
-        task_queue.push_back(task);
-        // 唤醒消费者
-        this->notEmpty->signal();
+    // // 若核心线程池未打满，直接创建线程执行
+    // if (curAliveThreadNUm < coreThreadNum)
+    // {
+    //     warm_up(task);
+    // }
+    // else // 将人物添加到任务队列中
+    // {
+    //     this->locker->lock();
 
-        this->locker->unlock();
+    //     if (isFull()) // 任务队列满，阻塞
+    //     {
+    //         // 条件变量等待
+    //         this->notFull->wait();
+    //     }
+    //     task_queue.push_back(task);
+    //     // 唤醒消费者
+    //     this->notEmpty->signal();
+
+    //     this->locker->unlock();
+    // }
+
+    warm_up(task);
+
+    this->locker->lock();
+
+    if (isFull()) // 任务队列满，阻塞
+    {
+        // 条件变量等待
+        this->notFull->wait();
     }
+    task_queue.push_back(task);
+
+    // 唤醒消费者
+    this->notEmpty->signal();
+
+    this->locker->unlock();
 }
 
 // 消费者消费任务
@@ -289,6 +332,9 @@ ThreadTask * Threadpool::consumeTask()
         // 取任务执行
         task = task_queue.front();
         task_queue.pop_front();
+
+    // ALLOC_ACCOUNT *p = (*((std::function<ALLOC_ACCOUNT *()> *)task->getCallback()))();
+    // printf("%s\n", p->account);
 
         // 唤醒生产者
         notFull->signal();
