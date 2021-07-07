@@ -1,13 +1,18 @@
 #ifndef LOGICSERVER_H
 #define LOGICSERVER_H
 
+#include <cstdio>
+#include <unistd.h>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <vector>
 #include <string>
 #include "protocol.h"
 
 using namespace std;
+
+extern char *curDir;
 
 // 提供对客户端请求的各种接口,都作为业务线程回调函数使用
 class LogicServer

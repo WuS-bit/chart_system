@@ -2,6 +2,7 @@
 
 std::map<std::string, int> user;
 std::map<int, std::string> find_user; // 文件描述符作键值
+LogicServer *logicServer = new LogicServer(); // 使用指针，保证全局唯一对象
 
 LogicServer::LogicServer()
 {
@@ -11,8 +12,6 @@ LogicServer::LogicServer()
 LogicServer::~LogicServer()
 {
 }
-
-LogicServer logicServer;
 
 
 ALLOC_ACCOUNT * LogicServer::do_alloc_account()
@@ -25,6 +24,7 @@ ALLOC_ACCOUNT * LogicServer::do_alloc_account()
     ptr->code = 200;
     // 此处线程不安全
     this->account++;
+    fprintf(stdout, "%s\n%lld\n", ptr->account, this->account);
 
     return ptr;
 }
@@ -71,6 +71,7 @@ RESPONSE_FRIEND_LIST * LogicServer::do_get_friend_list(const char *account)
             string username = ite->second;  
             list->array[i++].setAccount(username.c_str());
         }
+        ite++;
     }
 
     return list;
@@ -93,4 +94,31 @@ CHART_GROUP * LogicServer::do_chart_group(CHART_GROUP *)
 SERV_GROUP_RECORD * LogicServer::do_get_group_record()
 {
     // 读取群聊文件
+    SERV_GROUP_RECORD *record = (SERV_GROUP_RECORD *)malloc(sizeof(SERV_GROUP_RECORD));
+    record->num=0;
+    FILE * groupRecords;
+    char buf[512];
+    strcpy(buf, curDir);
+    strcat(buf, "group_records.txt");
+    groupRecords = fopen(buf, "r");
+    char msg[1096];
+    vector<ChartGroupRecord> res;
+    if (groupRecords != NULL)
+    {
+        while (fgets(msg, 1096, groupRecords) != NULL)
+        {
+            char sender[16];
+            strncpy(sender, msg, 12);
+            ChartGroupRecord *g = new ChartGroupRecord();
+            g->setContent(sender, msg+12);
+            res.push_back(*g);
+        }
+        
+    }
+    
+    record->records = new ChartGroupRecord[3];
+    record->records[0].setContent("1000022555", "你好阿!");
+    record->records[1].setContent("1000022555", "你好阿!");
+    record->records[2].setContent("1000022555", "你好阿!");
+    return record;
 }

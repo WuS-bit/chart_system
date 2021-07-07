@@ -42,7 +42,7 @@ public:
     EventLoop * getEventLoop();
 };
 
-extern LogicServer logicServer; // 全局对象，仅用来提供回调函数
+extern LogicServer *logicServer; // 全局对象，仅用来提供回调函数
 extern Threadpool *pool; // 全局业务线程池对象，每个连接均使用此线程池
 
 #endif

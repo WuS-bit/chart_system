@@ -1,6 +1,6 @@
 #include "include/net/TcpServer.h"
 
-map<int, TcpConnection *> clnt_conns;
+map<int, TcpConnection *> *clnt_conns = new map<int, TcpConnection *>();
 
 TcpServer::TcpServer(char *port)
 {

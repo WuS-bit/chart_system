@@ -28,7 +28,7 @@ class TcpConnection;
 class Threadpool;
 
 // extern Threadpool *pool;
-extern map<int, TcpConnection *> clnt_conns;
+extern map<int, TcpConnection *> *clnt_conns;
 
 class EventLoop
 {

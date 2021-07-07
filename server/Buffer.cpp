@@ -137,6 +137,45 @@ void * Buffer::readData(size_t len, int interface_type)
             ptr = (void *)data;
         }
         break;
+        case USER_TRANS_FILE:
+        {
+            printf("来了\n");
+            TRANS_FILE *data = (TRANS_FILE *)malloc(sizeof(TRANS_FILE));
+            printf("%d\n", data->fsize);
+            char *path = getcwd(NULL, 0);
+            char filepath[255];
+            int len = strlen(path);
+            if (path[len-1] != '/')
+            {
+                path[len] = '/';
+                path[len + 1] = '\0';
+            }
+            printf("%s\n", data->filename);
+            strcpy(filepath, path);
+            strcat(filepath, data->filename);
+            printf("%s\n",filepath);
+
+
+            FILE *file = fopen(filepath, "wb");
+
+            int ret=0, r=data->fsize;
+
+            if (file != NULL)
+            {
+                ret = fwrite(this->data+readIndex, 1, r, file);
+                readIndex += ret;
+                r -= ret;
+                while (r > 0)
+                {
+                    ret = fwrite(this->data+readIndex, 1, r, file);
+                    readIndex += ret;
+                    r -= ret;
+                }
+            }
+            printf("来了\n");
+            return data;
+        }
+        break;
         default:
             break;
         }

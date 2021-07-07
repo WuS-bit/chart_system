@@ -51,11 +51,11 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // 调用分配账号接口
 
             // 绑定业务逻辑的回调函数
-            std::function<ALLOC_ACCOUNT *()> callback;
-            callback = std::bind(&LogicServer::do_alloc_account, logicServer);
-            void * fptr = (void *)new std::function<ALLOC_ACCOUNT *()>(callback);;
+            // std::function<ALLOC_ACCOUNT *()> callback;
+            // callback = std::bind(&LogicServer::do_alloc_account, logicServer);
+            // void * fptr = (void *)new std::function<ALLOC_ACCOUNT *()>(callback);;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_GET_ACCOUNT, data, pool); 
+            // ThreadTask *task = new ThreadTask(this, fptr, USER_GET_ACCOUNT, data, pool); 
 
             // ALLOC_ACCOUNT *p = (*((std::function<ALLOC_ACCOUNT *()> *)task->getCallback()))();
             // printf("%s\n", p->account);
@@ -67,8 +67,8 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // pool->produceTask(task);
 
             // 得到业务处理回调函数并调用
-            std::function<ALLOC_ACCOUNT *()> *cb = (std::function<ALLOC_ACCOUNT *()> *)task->getCallback();
-            ALLOC_ACCOUNT *res = (*cb)();
+            // std::function<ALLOC_ACCOUNT *()> *cb = (std::function<ALLOC_ACCOUNT *()> *)task->getCallback();
+            ALLOC_ACCOUNT *res = logicServer->do_alloc_account();
             Header * header = (Header *)malloc(sizeof(Header));
             header->type = SERVER_ALLOC_ACCOUNT;
             header->length = sizeof(ALLOC_ACCOUNT);
@@ -101,18 +101,18 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // 调用用户注册接口
 
             // 绑定业务逻辑的回调函数
-            std::function<RESPONSE_STATUS *(char *, char *, char *)> callback;
-            callback = std::bind(&LogicServer::do_register, logicServer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-            void * fptr = (void *)&callback;
+            // std::function<RESPONSE_STATUS *(char *, char *, char *)> callback;
+            // callback = std::bind(&LogicServer::do_register, logicServer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+            // void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_REGISTER, data, pool);        
+            // ThreadTask *task = new ThreadTask(this, fptr, USER_REGISTER, data, pool);        
 
             // 交付线程池执行即可
             // pool->produceTask(task);
 
             // 在此线程中执行业务处理
             REGISTER * request = (REGISTER *)data;
-            RESPONSE_STATUS *res = callback(request->account, request->username, request->password);
+            RESPONSE_STATUS *res = logicServer->do_register(request->account, request->username, request->password);
 
             // 响应头
             Header *header = (Header *)malloc(sizeof(Header));
@@ -130,17 +130,17 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // 调用用户注册接口
 
             // 绑定业务逻辑的回调函数
-            std::function<LOGIN_RESPONSE *(char *, char *)> callback;
-            callback = std::bind(&LogicServer::do_login, logicServer, std::placeholders::_1, std::placeholders::_2);
-            void * fptr = (void *)&callback;
+            // std::function<LOGIN_RESPONSE *(char *, char *)> callback;
+            // callback = std::bind(&LogicServer::do_login, logicServer, std::placeholders::_1, std::placeholders::_2);
+            // void * fptr = (void *)&callback;
 
-            ThreadTask *task = new ThreadTask(this, fptr, USER_LOGIN, data, pool);        
+            // ThreadTask *task = new ThreadTask(this, fptr, USER_LOGIN, data, pool);        
 
             // 交付线程池执行即可
             // pool->produceTask(task);
 
             LOGIN * req = (LOGIN *)data;
-            LOGIN_RESPONSE *res = callback(req->account, req->password);
+            LOGIN_RESPONSE *res = logicServer->do_login(req->account, req->password);
 
             // 记录登录状态
             user.insert(std::pair<std::string, int>(res->account, this->sockfd));
@@ -148,9 +148,10 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
 
             // 广播所有在线用户
             map<int, TcpConnection *>::iterator iter;
-            iter = clnt_conns.begin();
-            while (iter != clnt_conns.end())
+            iter = clnt_conns->begin();
+            while (iter != clnt_conns->end())
             {
+                printf("lll\n");
                 TcpConnection *ptr = iter->second;
                 if (ptr != this)
                 {
@@ -159,16 +160,24 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
                     header->type = SERVER_RESPONSE_FRIEND_LIST;
                     header->length = sizeof(RESPONSE_FRIEND_LIST) + sizeof(FriendInfo)*(user.size()-1);
 
-                    // 获取该用户名
-                    string username = find_user.find(iter->first)->second;
+                    // 若该连接对应用户已经登录，则获取用户名
+                    if (find_user.find(iter->first) != find_user.end())
+                    {
+                        string username = find_user.find(iter->first)->second;
 
-                    RESPONSE_FRIEND_LIST *list = logicServer.do_get_friend_list(username.c_str());
+                        RESPONSE_FRIEND_LIST *list = logicServer->do_get_friend_list(username.c_str());
+
+                        for (int i = 0; i < list->friend_num; i++)
+                        {
+                            printf("%s\n", list->array[i].username);
+                        }
                     
                     
-                    ptr->onWriteMsg((char *)header, sizeof(Header));
-                    ptr->onWriteMsg((char *)list, sizeof(RESPONSE_FRIEND_LIST));
-                    ptr->onWriteMsg((char *)list->array, sizeof(FriendInfo)*list->friend_num);
-
+                        ptr->onWriteMsg((char *)header, sizeof(Header));
+                        ptr->onWriteMsg((char *)list, sizeof(RESPONSE_FRIEND_LIST));
+                    
+                        ptr->onWriteMsg((char *)list->array, sizeof(FriendInfo)*list->friend_num);   
+                    }
                 }
                 else
                 {
@@ -180,6 +189,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
                     this->onWriteMsg((char *)header, sizeof(Header));
                     this->onWriteMsg((char *)res, sizeof(LOGIN_RESPONSE));
                 }
+                iter++;
             }
         }
         break;
@@ -200,11 +210,14 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // pool->produceTask(task)
 
             GET_FRIEND_LIST * req = (GET_FRIEND_LIST *)data;
+
             RESPONSE_FRIEND_LIST *res = callback(req->account);
 
             Header *header = (Header *)malloc(sizeof(Header));
             header->type = SERVER_RESPONSE_FRIEND_LIST;
             header->length = sizeof(RESPONSE_FRIEND_LIST)+sizeof(FriendInfo)*res->friend_num;
+
+            
 
             this->onWriteMsg((char *)header, sizeof(Header));
             this->onWriteMsg((char *)res, sizeof(RESPONSE_FRIEND_LIST));
@@ -242,7 +255,7 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             // 实质上需要向用户会送消息发送成功ACK信息，简化后不需要，直接推送消息
             string name = res->recver;
             int sockfd = user.find(name)->second;
-            TcpConnection *conn = clnt_conns.find(sockfd)->second;
+            TcpConnection *conn = clnt_conns->find(sockfd)->second;
 
             conn->onWriteMsg((char *)header, sizeof(Header));
             conn->onWriteMsg((char *)res, sizeof(CHART_ONE));
@@ -309,10 +322,12 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             while (iter!=user.end())
             {
                 int sockfd = iter->second;
-                TcpConnection *conn = clnt_conns.find(sockfd)->second;
+                TcpConnection *conn = clnt_conns->find(sockfd)->second;
 
                 conn->onWriteMsg((char *)header, sizeof(Header));
                 conn->onWriteMsg((char *)res, sizeof(CHART_GROUP));
+
+                iter++;
             }
             
         }
@@ -362,9 +377,9 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
             {
                 string username = iter->first;
                 int sockfd = iter->second;
-                TcpConnection *conn = clnt_conns.find(sockfd)->second;
+                TcpConnection *conn = clnt_conns->find(sockfd)->second;
 
-                RESPONSE_FRIEND_LIST *list = logicServer.do_get_friend_list(username.c_str());
+                RESPONSE_FRIEND_LIST *list = logicServer->do_get_friend_list(username.c_str());
 
                 Header *header = (Header *)malloc(sizeof(Header));
                 header->type = SERVER_RESPONSE_FRIEND_LIST;
@@ -373,6 +388,115 @@ void TcpConnection::onMessageRecv(char *buf, size_t len)
                 conn->onWriteMsg((char *)header, sizeof(Header));
                 conn->onWriteMsg((char *)list, sizeof(RESPONSE_FRIEND_LIST));
                 conn->onWriteMsg((char *)list->array, sizeof(FriendInfo)*list->friend_num);
+
+                iter++;
+            }
+            
+        }
+        break;
+        case USER_TRANS_FILE:
+        {
+            TRANS_FILE *data = (TRANS_FILE *)recvBuffer.readData(sizeof(TRANS_FILE), USER_TRANS_FILE);
+            if (strcmp(data->recv, "000000000000") == 0)
+            {
+                // 群发
+                map<int, TcpConnection *>::iterator iter;
+                iter = clnt_conns->begin();
+                while (iter != clnt_conns->end())
+                {
+                    TcpConnection *conn = iter->second;
+
+                    Header *header = (Header *)malloc(sizeof(Header));
+                    header->type = USER_TRANS_FILE;
+                    header->length = sizeof(TRANS_FILE) + data->fsize;
+
+                    conn->onWriteMsg((char *)header, sizeof(Header));
+
+                    conn->onWriteMsg((char *)data, sizeof(TRANS_FILE));
+
+
+                    char *path = getcwd(NULL, 0);
+                    char filepath[255];
+                    int len = strlen(path);
+                    if (path[len-1] != '/')
+                    {
+                        path[len] = '/';
+                        path[len + 1] = '\0';
+                    }
+                    strcpy(filepath, path);
+                    strcat(filepath, data->filename);
+
+                    
+
+                    FILE *file = fopen(filepath, "rb");
+
+                    int ret=0, r=data->fsize;
+                    char buf[1024];
+
+                    if (file != NULL)
+                    {
+                        ret = fread(buf, 1, 1024, file);
+                        conn->onWriteMsg(buf, ret);
+                        
+                        r -= ret;
+                        while (r > 0)
+                        {
+                            ret = fread(buf, 1, 1024, file);
+                            conn->onWriteMsg(buf, ret);
+                            r -= ret;
+                        }
+                    }
+
+                    iter++;
+                }
+                
+            } 
+            else 
+            {
+                // 私发
+                string name = data->recv;
+                int sockfd = user.find(name)->second;
+                TcpConnection *conn = clnt_conns->find(sockfd)->second;
+                Header *header = (Header *)malloc(sizeof(Header));
+                header->type = USER_TRANS_FILE;
+                header->length = sizeof(TRANS_FILE) + data->fsize;
+
+                conn->onWriteMsg((char *)header, sizeof(Header));
+
+                conn->onWriteMsg((char *)data, sizeof(TRANS_FILE));
+
+
+                char *path = getcwd(NULL, 0);
+                char filepath[255];
+                int len = strlen(path);
+                if (path[len-1] != '/')
+                {
+                    path[len] = '/';
+                    path[len + 1] = '\0';
+                }
+                strcpy(filepath, path);
+                strcat(filepath, data->filename);
+
+                    
+
+                FILE *file = fopen(filepath, "rb");
+
+                int ret=0, r=data->fsize;
+                char buf[1024];
+
+                if (file != NULL)
+                {
+                    ret = fread(buf, 1, 1024, file);
+                    conn->onWriteMsg(buf, ret);
+                        
+                    r -= ret;
+                    while (r > 0)
+                    {
+                        ret = fread(buf, 1, 1024, file);
+                        conn->onWriteMsg(buf, ret);
+                        r -= ret;
+                    }
+                }
             }
             
         }
@@ -409,6 +533,7 @@ void TcpConnection::onWriteMsg(char *buf, size_t len)
         if (ret >= 0 && ret == len)
         {
             // 全部写入内核缓冲区
+            this->eventLoop->modfd(sockfd, EPOLLIN);
             return;
         }
         else if (ret < 0)

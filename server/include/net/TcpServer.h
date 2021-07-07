@@ -32,6 +32,6 @@ public:
     void run();
 };
 
-extern map<int, TcpConnection *> clnt_conns;
+extern map<int, TcpConnection *> *clnt_conns;
 
 #endif

@@ -100,8 +100,8 @@ void EventLoop::loop()
             int sockfd = events[i].data.fd;
             TcpConnection *conn = NULL;
             map<int, TcpConnection *>::iterator ite;
-            ite = clnt_conns.find(sockfd);
-            if (ite != clnt_conns.end())
+            ite = clnt_conns->find(sockfd);
+            if (ite != clnt_conns->end())
             {
                 conn = ite->second;
             }
@@ -111,7 +111,6 @@ void EventLoop::loop()
 
             if (this->events[i].events & EPOLLIN)
             {
-                fprintf(stdout, "读到数据\n");
                 // 处理连接读事件
                 while (1)
                 {
@@ -129,7 +128,7 @@ void EventLoop::loop()
                         }
                         // 异常情况，表示连接发生异常，断开连接
                         delete conn;
-                        clnt_conns.erase(sockfd);
+                        clnt_conns->erase(sockfd);
                         delfd(sockfd);
                         close(sockfd);
                         break;
@@ -151,9 +150,11 @@ void EventLoop::loop()
                         // 这里会改变用户在线状态
                         conn->onMessageRecv(b, sizeof(Header)+sizeof(LOGOUT));
 
+                        printf("close conn\n");
+
 
                         delete conn;
-                        clnt_conns.erase(sockfd);
+                        clnt_conns->erase(sockfd);
                         delfd(sockfd);
                         close(sockfd);
                         break;
@@ -187,6 +188,8 @@ bool EventLoop::addConn(TcpConnection *conn)
     // 将连接对象套接字加到epoll对象上管理
     this->addfd(sockfd);
     // 将连接加到全局连接管理数据结构中
-    clnt_conns.insert(pair<int, TcpConnection*>(sockfd, conn));
+    clnt_conns->insert(pair<int, TcpConnection*>(sockfd, conn));
+    // printf("%d\n",clnt_conns->size());
+
     return true;
 }

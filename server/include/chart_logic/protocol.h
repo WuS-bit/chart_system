@@ -128,6 +128,18 @@ typedef struct LOGOUT
     int sockfd;
 }LOGOUT;
 
+#define USER_TRANS_FILE 16
+typedef struct TRANS_FILE
+{
+    char sender[16];
+    char recv[16];
+    char filename[255];
+    unsigned long long fsize;
+}TRANS_FILE;
+
+
+
+
 
 
 // struct BinaryBody

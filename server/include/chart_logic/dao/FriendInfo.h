@@ -1,10 +1,13 @@
 #ifndef FRIENDINFO_H
 #define FRIENDINFO_H
 
+#include <cstring>
+
+using namespace std;
 
 class FriendInfo
 {
-private:
+public:
     char account[16];
     char username[32];
 public:
